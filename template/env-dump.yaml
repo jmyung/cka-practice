@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: env-dump
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    command:
+      - env
+    env:
+      - name: STUDENT_NAME
+        valueFrom:
+          configMapKeyRef:
+            name: exam-map
+            key: studentName
+      - name: SCHOOL
+        valueFrom:
+          configMapKeyRef:
+            name: exam-map
+            key: school
+      - name: KUBERNETES
+        valueFrom:
+          configMapKeyRef:
+            name: exam-map
+            key: kubernetes
+  restartPolicy: Never

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: alpine-label
+  namespace: default
+  labels:
+    runnings: afterLabels
+spec:
+  containers:
+  - name: alpine
+    image: alpine
+    command:
+      - sleep
+      - "60
+    ports:
+    - containerPort: 80
+  restartPolicy: Always
