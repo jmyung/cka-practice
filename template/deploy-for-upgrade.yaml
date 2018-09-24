@@ -1,0 +1,21 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: dummy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dum
+  template:
+    metadata:
+      labels:
+        app: dum
+    spec:
+      containers:
+      - name: dd
+        image: busybox
+        command:
+        - sleep
+        - "3600"
+      restartPolicy: Always

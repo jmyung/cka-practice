@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nodeselect
+spec:
+  containers:
+  - name: busy
+    image: busybox
+    command:
+    - sleep
+    - "300"
+    imagePullPolicy: IfNotPresent
+  restartPolicy: Always
+  nodeSelector:
+    myDarling: bestOne
