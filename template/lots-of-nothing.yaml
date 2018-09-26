@@ -1,0 +1,17 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: lots-of-nothing
+spec:
+  selector:
+    matchLabels:
+      timeToGet: schwifty
+  replicas: 6
+  template:
+    metadata:
+      labels:
+        timeToGet: schwifty
+    spec:
+      containers:
+      - name: pickle-rick
+        image: k8s.gcr.io/pause:2.0
