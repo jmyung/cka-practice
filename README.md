@@ -87,6 +87,7 @@ as root:
 
 ```
 sudo apt install -y docker.io
+
 cat << EOF > /etc/docker/daemon.json
 {
   "exec-opts": ["native.cgroupdriver=systemd"]
@@ -99,8 +100,7 @@ apt-key list
 cat << EOF > /etc/apt/sources.list.d/kubernetes.list
 deb http://apt.kubernetes.io/ kubernetes-xenial main
 EOF
-root@jesang-myung-9cf25ac51:~# cat /etc/apt/sources.list.d/kubernetes.list
-deb http://apt.kubernetes.io/ kubernetes-xenial main
+
 root@jesang-myung-9cf25ac51:~# apt update
 Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu xenial InRelease
 Hit:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu xenial-updates InRelease
@@ -113,6 +113,7 @@ Reading package lists... Done
 Building dependency tree       
 Reading state information... Done
 1 package can be upgraded. Run 'apt list --upgradable' to see it.
+
 root@jesang-myung-9cf25ac51:~# apt install -y kubelet kubeadm kubectl
 root@jesang-myung-9cf25ac51:~# kubeadm init --pod-network-cidr=10.244.0.0/16
 ```
@@ -716,5 +717,206 @@ Commercial support is available at
 
 ## Lecture: Deploying a Load Balancer
 
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: la-lb-service
+spec:
+  selector:
+    app: la-lb
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 9376
+  type: LoadBalancer
+  clusterIp: 10.0.171.223
+  loadBalancerIp: 78.12.23.17
+```
+
+
+
 
 ## Lecture: Configure & Use Cluster DNS
+
+`k run b4 --image busybox --replicas=2 --command -- sh -c "sleep 3600"`
+
+
+## Lecture: Persistent Volumes, Part 1
+
+### awsElasticBlockStore (04:00)
+- command
+`aws ec2 create-volume --availability-zone=eu-west-1a --size=10 --volume-type=gp2`
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-ebs
+spec:
+  containers:
+  - image: k8s.gcr.io/test-webserver
+    name: test-container
+    volumeMounts:
+    - mountPath: /test-ebs
+      name: test-volume
+    volumes:
+    - name: test-volume
+      awsElasticBlockStore:
+        volumeID: <volume-id>
+        fsType: ext4
+```
+
+
+### gcePersistentDisk
+
+`gcloud compute disks create --size=500GB --zone=us-central1-a my-data-disk`
+
+
+## Lecture: Applications & Persistent Storage
+
+### NFS Server
+
+`sudo apt install nfs-kernel-server`
+
+`sudo mkdir /var/nfs/general -p`
+
+```
+user@jesang-myung-9cf25ac51:~$ sudo chown nobody:nogroup /var/nfs/general
+
+user@jesang-myung-9cf25ac51:~$ ll /var/nfs/general
+total 8
+drwxr-xr-x 2 nobody nogroup 4096 Sep 29 14:15 ./
+drwxr-xr-x 3 root   root    4096 Sep 29 14:15 ../
+```
+```
+user@jesang-myung-9cf25ac51:~$ sudo vi /etc/exports
+
+# /etc/exports: the access control list for filesystems which may be exported
+#               to NFS clients.  See exports(5).
+#
+# Example for NFSv2 and NFSv3:
+# /srv/homes       hostname1(rw,sync,no_subtree_check) hostname2(ro,sync,no_subtree_check)
+#
+# Example for NFSv4:
+# /srv/nfs4        gss/krb5i(rw,sync,fsid=0,crossmnt,no_subtree_check)
+# /srv/nfs4/homes  gss/krb5i(rw,sync,no_subtree_check)
+#
+/var/nfs/general 172.31.20.80(rw,sync,no_subtree_check) 172.31.21.218(rw,sync,no_subtree_check) 172.31.103.90(rw,sync,no_subtree_check)
+```
+
+`user@jesang-myung-9cf25ac51:~$ sudo systemctl restart nfs-kernel-server`
+
+
+### master & worker's nodes
+
+`user@jesang-myung-9cf25ac54:~# sudo apt install nfs-common`
+
+`user@jesang-myung-9cf25ac54:~/template$ kubectl apply -f pv.yaml`
+
+```
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lapv
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Recycle
+  nfs:
+    path: /var/nfs/general
+    server: 172.31.40.8
+    readOnly: false
+```
+```
+user@jesang-myung-9cf25ac54:~/template$ kubectl get pv
+NAME      CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM     STORAGECLASS   REASON    AGE
+lapv      1Gi        RWX            Recycle          Available                                      15s
+```
+
+
+`user@jesang-myung-9cf25ac54:~/template$ k apply -f pvc.yaml`
+
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+```
+
+```
+user@jesang-myung-9cf25ac54:~/template$ k get pvc
+NAME      STATUS    VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+nfs-pvc   Bound     lapv      1Gi        RWX                           4s
+
+user@jesang-myung-9cf25ac54:~/template$ k get pv
+NAME      CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS    CLAIM             STORAGECLASS   REASON    AGE
+lapv      1Gi        RWX            Recycle          Bound     default/nfs-pvc                            5m
+```
+
+`user@jesang-myung-9cf25ac54:~/template$ k apply -f nfs-pod.yaml`
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-pod
+  labels:
+    name: nfs-pod
+spec:
+  containers:
+  - name: nfs-ctn
+    image: busybox
+    command:
+    - sleep
+    - "3600"
+    volumeMounts:
+    - name: nfsvol
+      mountPath: /tmp
+  restartPolicy: Always
+  securityContext:
+    fsGroup: 65534
+    runAsUser: 65534
+  volumes:
+  - name: nfsvol
+    persistentVolumeClaim:
+      claimName: nfs-pvc
+```
+
+```
+user@jesang-myung-9cf25ac54:~/template$ k get po
+NAME      READY     STATUS    RESTARTS   AGE
+nfs-pod   1/1       Running   0          1m
+```
+
+### touch file on pod
+```
+user@jesang-myung-9cf25ac54:~/template$ k exec -it nfs-pod -- sh
+/ $ cd /tmp
+/tmp $ ls -l
+total 0
+
+/tmp $ touch hello-from-pod
+/tmp $ ls -l
+total 0
+-rw-r--r--    1 nobody   nogroup          0 Sep 29 15:23 hello-from-pod
+```
+
+### check in nfs server
+```
+user@jesang-myung-9cf25ac51:~$ cd /var/nfs/general/
+user@jesang-myung-9cf25ac51:/var/nfs/general$ ll
+total 8
+drwxr-xr-x 2 nobody nogroup 4096 Sep 29 15:23 ./
+drwxr-xr-x 3 root   root    4096 Sep 29 14:15 ../
+-rw-r--r-- 1 nobody nogroup    0 Sep 29 15:23 hello-from-pod
+```

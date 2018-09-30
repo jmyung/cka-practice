@@ -1,0 +1,7 @@
+spec:
+  volumes:
+  - name: git-volume
+    gitRepo:
+      repository: "git@somewhere:me/my-git-repo.git"
+      revision: "22f1d8sde9495340954309t0984305944344"
+      

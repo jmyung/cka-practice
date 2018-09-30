@@ -1,0 +1,17 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: bit-of-nothing
+spec:
+  selector:
+    matchLabels:
+      app: pause
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: pause
+    spec:
+      containers:
+      - name: bitty
+        image: k8s.gcr.io/pause:2.0
