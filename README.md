@@ -116,6 +116,7 @@ Reading state information... Done
 
 root@jesang-myung-9cf25ac51:~# apt install -y kubelet kubeadm kubectl
 root@jesang-myung-9cf25ac51:~# kubeadm init --pod-network-cidr=10.244.0.0/16
+ --apiserver-advertise-address="publicIp"
 ```
 
 ```
@@ -192,7 +193,7 @@ Pod Template:
 k rollout undo deployment/nginx-deployment --to-revision=2
 
 
-
+apt-get install kubernetes-cni=0.6.0-00
 
 
 
@@ -370,6 +371,13 @@ node/jesang-myung-9cf25ac51.mylabserver.com tainted
 `deploy-for-upgrade.yaml`
 
 `apt install -y kubelet="1.11.1-00" kubectl="1.11.1-00" kubeadm="1.11.1-00"`
+
+[kubelet : Depends: kubernetes-cni (= 0.6.0) but 0.6.0-02 is to be installed]
+
+`apt-get install kubernetes-cni=0.6.0-00`
+
+필요시
+swapoff -a
 
 ```
 user@jesang-myung-9cf25ac56:~/templete$ k get no
@@ -919,4 +927,207 @@ total 8
 drwxr-xr-x 2 nobody nogroup 4096 Sep 29 15:23 ./
 drwxr-xr-x 3 root   root    4096 Sep 29 14:15 ../
 -rw-r--r-- 1 nobody nogroup    0 Sep 29 15:23 hello-from-pod
+```
+
+
+
+
+## Lecture: TLS Certificates for Cluster Components
+
+- install : https://docs.bigchaindb.com/projects/server/en/v1.1.0/production-deployment-template/easy-rsa.html?highlight=re
+
+```
+user@jesang-myung-9cf25ac52:~/k8s/easy-rsa-master/easy-rsa-3.0.1/easyrsa3$ ll
+total 64
+drwxrwxr-x 3 user user  4096 Oct 26  2015 ./
+drwxrwxr-x 8 user user  4096 Oct 26  2015 ../
+-rwxrwxr-x 1 user user 34910 Oct 26  2015 easyrsa*
+-rw-rw-r-- 1 user user  4560 Oct 26  2015 openssl-1.0.cnf
+-rw-rw-r-- 1 user user  8126 Oct 26  2015 vars.example
+drwxrwxr-x 2 user user  4096 Oct 26  2015 x509-types/
+user@jesang-myung-9cf25ac52:~/k8s/easy-rsa-master/easy-rsa-3.0.1/easyrsa3$ ./easyrsa init-pki
+init-pki complete; you may now create a CA or requests.
+Your newly created PKI dir is: /home/user/k8s/easy-rsa-master/easy-rsa-3.0.1/easyrsa3/pki
+```
+
+```
+user@jesang-myung-9cf25ac52:~/k8s/easy-rsa-master/easy-rsa-3.0.1/easyrsa3$ ./easyrsa --batch "--req-cn=${MASTER_IP}@`date +%s`" build-ca nopass
+Generating a 2048 bit RSA private key
+.............................................................................................+++
+..............................................................+++
+writing new private key to '/home/user/k8s/easy-rsa-master/easy-rsa-3.0.1/easyrsa3/pki/private/ca.key.lxY2phuukS'
+-----
+```
+
+```
+user@jesang-myung-9cf25ac52:~/k8s$ cat rsa-request.sh
+#!/bin/bash
+./easyrsa --subject-alt-name="IP:${MASTER_IP},"\
+"IP:${MASTER_IP},"\
+"DNS:kubernetes,"\
+"DNS:kubernetes.default,"\
+"DNS:kubernetes.default.svc,"\
+"DNS:kubernetes.default.svc.cluster,"\
+"DNS:kubernetes.default.svc.cluster.local" \
+--days=10000 \
+build-server-full server nopass
+```
+
+```
+user@jesang-myung-9cf25ac52:~/k8s/easy-rsa-master/easy-rsa-3.0.1/easyrsa3/pki/private$ ll
+total 16
+drwx------ 2 user user 4096 Oct  6 05:41 ./
+drwx------ 6 user user 4096 Oct  6 05:41 ../
+-rw------- 1 user user 1704 Oct  6 05:40 ca.key
+-rw------- 1 user user 1704 Oct  6 05:41 server.key
+user@jesang-myung-9cf25ac52:~/k8s/easy-rsa-master/easy-rsa-3.0.1/easyrsa3/pki/private$ ps aux | grep apiserver
+root      1872  2.3  3.6 417228 296696 ?       Ssl  05:06   0:52 kube-apiserver --authorization-mode=Node,RBAC --advertise-address=172.31.34.77 --allow-privileged=true --client-ca-file=/etc/kubernetes/pki/ca.crt
+--enable-admission-plugins=NodeRestriction --enable-bootstrap-token-auth=true --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt --etcd-keyfile=/etc/kubern
+etes/pki/apiserver-etcd-client.key --etcd-servers=https://127.0.0.1:2379 --insecure-port=0 --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt --kubelet-client-key=/etc/kubernetes/pki/ap
+iserver-kubelet-client.key --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt --proxy-client-key-file=/etc/kubernetes/pki/front-pr
+oxy-client.key --requestheader-allowed-names=front-proxy-client --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-hea
+ders=X-Remote-Group --requestheader-username-headers=X-Remote-User --secure-port=6443 --service-account-key-file=/etc/kubernetes/pki/sa.pub --service-cluster-ip-range=10.96.0.0/12 --tls-cert-file=/etc/kubernetes/
+pki/apiserver.crt --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
+user     12601  0.0  0.0  12944   980 pts/0    S+   05:44   0:00 grep --color=auto apiserver
+```
+
+--client-ca-file=/etc/kubernetes/pki/ca.crt
+
+
+## Lecture: Defining Security Contexts
+
+`security.yaml`
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: security-context-pod
+spec:
+  securityContext:
+    runAsUser: 1000
+    fsGroup: 2000
+  volumes:
+  - name: sam-vol
+    emptyDir: {}
+  containers:
+  - name: sample-container
+    image: gcr.io/google-samples/node-hello:1.0
+    volumeMounts:
+    - name: sam-vol
+      mountPath: /data/demo
+    securityContext:
+      allowPrivilegeEscalation: false
+```
+
+```
+root@jesang-myung-9cf25ac52:~# k get po --watch
+NAME                   READY   STATUS              RESTARTS   AGE
+security-context-pod   1/1   Running   0     3m19s
+
+root@jesang-myung-9cf25ac52:~# k exec -it security-context-pod -- sh
+$ ps aux
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+1000         1  0.0  0.0   4336   812 ?        Ss   06:03   0:00 /bin/sh -c node server.js
+1000         5  0.1  0.2 772124 22672 ?        Sl   06:03   0:00 node server.js
+1000        10  0.0  0.0   4336   748 ?        Ss   06:04   0:00 sh
+1000        16  0.0  0.0  17500  2128 ?        R+   06:04   0:00 ps aux
+
+$ cd /data
+$ ls -la
+total 12
+drwxr-xr-x  3 root root 4096 Oct  6 06:03 .
+drwxr-xr-x 48 root root 4096 Oct  6 06:03 ..
+drwxrwsrwx  2 root 2000 4096 Oct  6 06:03 demo
+
+$ cd demo
+$ echo LinuxAcademy > test
+$ ls -l
+total 4
+-rw-r--r-- 1 1000 2000 13 Oct  6 06:05 test
+$ ls -la
+total 12
+drwxrwsrwx 2 root 2000 4096 Oct  6 06:05 .
+drwxr-xr-x 3 root root 4096 Oct  6 06:03 ..
+-rw-r--r-- 1 1000 2000   13 Oct  6 06:05 test
+
+$ whoami
+whoami: cannot find name for user ID 1000
+```
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: security-context-pod
+spec:
+  securityContext:
+    runAsUser: 1000
+    fsGroup: 2000
+  volumes:
+  - name: sam-vol
+    emptyDir: {}
+  containers:
+  - name: sample-container
+    image: gcr.io/google-samples/node-hello:1.0
+    volumeMounts:
+    - name: sam-vol
+      mountPath: /data/demo
+    securityContext:
+      runAsUser: 2000  # 추가
+      allowPrivilegeEscalation: false
+```
+
+```
+root@jesang-myung-9cf25ac52:~# k exec -it security-context-pod sh
+$ ps aux
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+2000         1  0.0  0.0   4336   712 ?        Ss   06:10   0:00 /bin/sh -c node server.js
+2000         5  0.3  0.2 772124 22476 ?        Sl   06:10   0:00 node server.js
+2000        10  0.0  0.0   4336   756 ?        Ss   06:11   0:00 sh
+2000        14  0.0  0.0  17500  1976 ?        R+   06:11   0:00 ps aux
+```
+
+
+
+## ETCD backup
+
+```
+etcd
+--advertise-client-urls=https://127.0.0.1:2379
+--cert-file=/var/lib/localkube/certs/etcd/server.crt
+--key-file=/var/lib/localkube/certs/etcd/server.key
+--trusted-ca-file=/var/lib/localkube/certs/etcd/ca.crt
+--peer-cert-file=/var/lib/localkube/certs/etcd/peer.crt
+--peer-key-file=/var/lib/localkube/certs/etcd/peer.key
+--peer-trusted-ca-file=/var/lib/localkube/certs/etcd/ca.crt
+--listen-client-urls=https://127.0.0.1:2379
+--peer-client-cert-auth=true
+--data-dir=/data/minikube
+--client-cert-auth=true
+
+
+etcdctl --endpoints "https://127.0.0.1:2379" \
+        --cert-file=/var/lib/localkube/certs/etcd/healthcheck-client.crt \
+        --key-file=/var/lib/localkube/certs/etcd/healthcheck-client.key \
+        --ca-file=/var/lib/localkube/certs/etcd/ca.crt \
+        cluster-health
+
+etcdctl --endpoints "https://127.0.0.1:2379" \
+        --cert-file=/var/lib/localkube/certs/etcd/healthcheck-client.crt \
+        --key-file=/var/lib/localkube/certs/etcd/healthcheck-client.key \
+        --ca-file=/var/lib/localkube/certs/etcd/ca.crt \
+        member list
+
+ETCDCTL_API=3 etcdctl --endpoints "https://127.0.0.1:2379" \
+        --cacert="ca.crt" \
+        --key="healthcheck-client.key" \
+        --cert="healthcheck-client.crt" \
+        member list
+
+ETCDCTL_API=3 etcdctl --endpoints "https://127.0.0.1:2379" \
+        --cacert="ca.crt" \
+        --key="healthcheck-client.key" \
+        --cert="healthcheck-client.crt" \
+         snapshot save snapshotdb
 ```
