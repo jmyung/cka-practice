@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pd
+spec:
+  containers:
+  - image: nginx
+    name: test-container
+    volumeMounts:
+    - mountPath: /cache
+      name: cache-volume
+  initContainers:
+  - name: init-busybox
+    image: busybox
+    command: ["sh", "-c", "cd /cache2 && touch mm"]
+    volumeMounts:
+    - mountPath: /cache2
+      name: cache-volume
+  volumes:
+  - name: cache-volume
+    emptyDir: {}

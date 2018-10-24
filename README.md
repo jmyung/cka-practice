@@ -1,85 +1,6 @@
 # CKA Prep
 CKA 준비자료
 
-## 1. Setup
-- tag 달아주기
-  - master
-  - worker
-- 설정
-  - id : user
-  - pw : 123456
-
-```
-user@jesang-myung-9cf25ac51:~$ sudo kubeadm init --pod-network-cidr=10.244.0.0/16
-[sudo] password for user:
-[init] using Kubernetes version: v1.11.2
-[preflight] running pre-flight checks
-I0902 20:30:10.524959   16059 kernel_validator.go:81] Validating kernel version
-I0902 20:30:10.525334   16059 kernel_validator.go:96] Validating kernel config
-[preflight/images] Pulling images required for setting up a Kubernetes cluster
-[preflight/images] This might take a minute or two, depending on the speed of your internet connection
-[preflight/images] You can also perform this action in beforehand using 'kubeadm config images pull'
-[kubelet] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
-[kubelet] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
-[preflight] Activating the kubelet service
-[certificates] Generated ca certificate and key.
-[certificates] Generated apiserver certificate and key.
-[certificates] apiserver serving cert is signed for DNS names [jesang-myung-9cf25ac51.mylabserver.com kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs
-[10.96.0.1 172.31.25.246]
-[certificates] Generated apiserver-kubelet-client certificate and key.
-[certificates] Generated sa key and public key.
-[certificates] Generated front-proxy-ca certificate and key.
-[certificates] Generated front-proxy-client certificate and key.
-[certificates] Generated etcd/ca certificate and key.
-[certificates] Generated etcd/server certificate and key.
-[certificates] etcd/server serving cert is signed for DNS names [jesang-myung-9cf25ac51.mylabserver.com localhost] and IPs [127.0.0.1 ::1]
-[certificates] Generated etcd/peer certificate and key.
-[certificates] etcd/peer serving cert is signed for DNS names [jesang-myung-9cf25ac51.mylabserver.com localhost] and IPs [172.31.25.246 127.0.0.1 ::1]
-[certificates] Generated etcd/healthcheck-client certificate and key.
-[certificates] Generated apiserver-etcd-client certificate and key.
-[certificates] valid certificates and keys now exist in "/etc/kubernetes/pki"
-[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/admin.conf"
-[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/kubelet.conf"
-[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/controller-manager.conf"
-[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/scheduler.conf"
-[controlplane] wrote Static Pod manifest for component kube-apiserver to "/etc/kubernetes/manifests/kube-apiserver.yaml"
-[controlplane] wrote Static Pod manifest for component kube-controller-manager to "/etc/kubernetes/manifests/kube-controller-manager.yaml"
-[controlplane] wrote Static Pod manifest for component kube-scheduler to "/etc/kubernetes/manifests/kube-scheduler.yaml"
-[etcd] Wrote Static Pod manifest for a local etcd instance to "/etc/kubernetes/manifests/etcd.yaml"
-[init] waiting for the kubelet to boot up the control plane as Static Pods from directory "/etc/kubernetes/manifests"
-[init] this might take a minute or longer if the control plane images have to be pulled
-[apiclient] All control plane components are healthy after 39.002903 seconds
-[uploadconfig] storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
-[kubelet] Creating a ConfigMap "kubelet-config-1.11" in namespace kube-system with the configuration for the kubelets in the cluster
-[markmaster] Marking the node jesang-myung-9cf25ac51.mylabserver.com as master by adding the label "node-role.kubernetes.io/master=''"
-[markmaster] Marking the node jesang-myung-9cf25ac51.mylabserver.com as master by adding the taints [node-role.kubernetes.io/master:NoSchedule]
-[patchnode] Uploading the CRI Socket information "/var/run/dockershim.sock" to the Node API object "jesang-myung-9cf25ac51.mylabserver.com" as an annotation
-[bootstraptoken] using token: 4ssaac.6pss4dmnfql6dkqm
-[bootstraptoken] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
-[bootstraptoken] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
-[bootstraptoken] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
-[bootstraptoken] creating the "cluster-info" ConfigMap in the "kube-public" namespace
-[addons] Applied essential addon: CoreDNS
-[addons] Applied essential addon: kube-proxy
-
-Your Kubernetes master has initialized successfully!
-
-To start using your cluster, you need to run the following as a regular user:
-
-  mkdir -p $HOME/.kube
-  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-  sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-You should now deploy a pod network to the cluster.
-Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
-  https://kubernetes.io/docs/concepts/cluster-administration/addons/
-
-You can now join any number of machines by running the following on each node
-as root:
-
-  kubeadm join 172.31.25.246:6443 --token 4ssaac.6pss4dmnfql6dkqm --discovery-token-ca-cert-hash sha256:a7cdd3dff1e95096ec01b17b48d778eba00e51c86550f9335237e5763f68f55d
-```
-
 
 ## Raw Kubernetes Install
 
@@ -993,6 +914,40 @@ user     12601  0.0  0.0  12944   980 pts/0    S+   05:44   0:00 grep --color=au
 
 --client-ca-file=/etc/kubernetes/pki/ca.crt
 
+`ootstrap-kubelet.conf`
+```
+/usr/bin/kubelet \
+--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf \
+--kubeconfig=/etc/kubernetes/kubelet.conf \
+--config=/var/lib/kubelet/config.yaml \
+--cgroup-driver=systemd \
+--cni-bin-dir=/opt/cni/bin \
+--cni-conf-dir=/etc/cni/net.d \
+--network-plugin=cni
+```
+
+
+```
+root@ubuntu03:/etc/kubernetes# cat bootstrap-kubelet.conf
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRFNE1UQXdOekUyTWpNeE1Gb1hEVEk0TVRBd05ERTJNak14TUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBT0lVCnB0eVFLN2xoUXlpWEZ0am1nRW9yVUoyOUFVU0hNcm1zamRodlAxbkt4WWhVUkVaRE02VW1LaUNCdC82a3NnSFAKNDBJYlFCYjBNc2ZhWnI2b3h2VlF2bFVUYWpxYkJuZnBKUEJKY0RNaEFaVUhjV3FHQjV5dDZ0dC80UnErY3dJNwprUUU3ZUFRYk9uQUFQZU9Ldm13OTBMVlJ1YzhvMmJKK1hwZEI3UjdYN0xEazNhSW83ZVNGMDRXd2gvYU1CSHkwCndCZk13WUZuK2RUR0xxTFJNeDgyODAzSTkyMThGcEI0RGFHNnZCUlF5aGFPdDJNbktsL0F4V2FWbXVVd1lENy8KMktReStLd3lBdXVsK0RWeEpMbldUUDBSaFVDTXNLNHBUazdKWXhUb3NTVkl1TXUxQjlpUTlmMjM5Qnh3NHBoVQpDak15QzA0NGJnbVdFdmI5TXljQ0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFCbGdSdTlWanJ1emRTakM4b0RwZGVIeHdoTjYKb1Q0TFpaYUt6emQ2c2ZBbzJFVWRURzlQUUZzc0diS2hlVVhaSnQybDRwT2l3YzNTc1I3Z2laQ0cwdjRhTlE5awplYml6WHJZaHZGS1dXeGN5R0J1RUY3Q05sYWhjdDFqZEFDZG9QZnN4a0xHMnBzZjVUeXI2OGdYekNHdStCUkNoCjdhc3Z6VzRTQUpQdUtlNlZuRWVGSEFKNDU2UHl3U0lPTVc2SklmWmNUTmxKaFVERXNncmNOczVVV09OMllDd1AKNUxNWEw5SW1SUHB4eEdwUEFpemNBRitzL0daV1B4UENZZWtQNE1hVkhTN3ZWREorMTV2bVFrSUJWRTBmSmFHZwpjbFFsYWtMKzNwR2x6amx3cS80dU1yblNOK0pXMEhEVWRpOG1SZGJTTzZjcTdOMHFZdHFycW9NVzJ1MD0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    server: https://192.168.1.11:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: tls-bootstrap-token-user
+  name: tls-bootstrap-token-user@kubernetes
+current-context: tls-bootstrap-token-user@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: tls-bootstrap-token-user
+  user:
+    token: vi82um.g4bja8bz9iyqfu1l
+```
 
 ## Lecture: Defining Security Contexts
 
@@ -1130,4 +1085,25 @@ ETCDCTL_API=3 etcdctl --endpoints "https://127.0.0.1:2379" \
         --key="healthcheck-client.key" \
         --cert="healthcheck-client.crt" \
          snapshot save snapshotdb
+```
+
+## ETC
+
+### 다른노드의 팟 접근 안됨
+ubuntu@ubuntu01:~/template$ k logs config-test-pod
+Error from server (NotFound): the server could not find the requested resource ( pods/log config-test-pod)
+
+### I had the same issue on Ubuntu 16.04.1 LTS (using flannel for the networking)
+```
+kubeadm reset
+systemctl stop kubelet
+systemctl stop docker
+rm -rf /var/lib/cni/
+rm -rf /var/lib/kubelet/*
+rm -rf /etc/cni/
+ifconfig cni0 down
+ifconfig flannel.1 down
+ifconfig docker0 down
+ip link delete cni0
+ip link delete flannel.1
 ```
